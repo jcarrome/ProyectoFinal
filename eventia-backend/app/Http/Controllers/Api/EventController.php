@@ -8,10 +8,42 @@ use Illuminate\Http\Request;
 
 class EventController extends Controller
 {
-    // Listar todos los eventos
-    public function index()
+    // Listar todos los eventos con filtros
+    public function index(Request $request)
     {
-        $events = Event::where('is_cancelled', false)->get();
+        $query = Event::where('is_cancelled', false);
+
+        // Filtro por búsqueda de texto (título o descripción)
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        // Filtro por fecha específica
+        if ($request->has('date') && $request->date) {
+            $query->whereDate('date_time', $request->date);
+        }
+
+        // Filtro por modalidad
+        if ($request->has('modality') && $request->modality) {
+            $query->where('modality', $request->modality);
+        }
+
+        // Filtro por rango de fechas
+        if ($request->has('date_from') && $request->date_from) {
+            $query->whereDate('date_time', '>=', $request->date_from);
+        }
+        if ($request->has('date_to') && $request->date_to) {
+            $query->whereDate('date_time', '<=', $request->date_to);
+        }
+
+        // Ordenar por fecha (próximos eventos primero)
+        $query->orderBy('date_time', 'asc');
+
+        $events = $query->get();
         return response()->json(['data' => $events], 200);
     }
 

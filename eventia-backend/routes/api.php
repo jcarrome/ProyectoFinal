@@ -13,8 +13,11 @@ Route::post('/events', [EventController::class, 'store']);
 Route::put('/events/{id}', [EventController::class, 'update']);
 Route::delete('/events/{id}', [EventController::class, 'destroy']);
 
-// RSVP
+// RSVP y Lista de Espera
 Route::post('/rsvp', [RsvpController::class, 'store']);
+Route::post('/rsvp/cancel', [RsvpController::class, 'cancel']);
+Route::get('/rsvp/status', [RsvpController::class, 'status']);
+Route::get('/events/{id}/waitlist', [RsvpController::class, 'waitlist']);
 
 // Asistencia
 Route::post('/check-in', [AttendanceController::class, 'checkIn']);
