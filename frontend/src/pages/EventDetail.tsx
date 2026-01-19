@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 
+interface WaitlistInfo {
+  capacidad: number;
+  confirmados: number;
+  cupos_disponibles: number;
+  en_lista_espera: number;
+}
+
 export const EventDetail = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -8,12 +15,20 @@ export const EventDetail = () => {
   const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'warning'>('success');
   const [submitted, setSubmitted] = useState(false);
+  const [waitlistInfo, setWaitlistInfo] = useState<WaitlistInfo | null>(null);
+  const [isInWaitlist, setIsInWaitlist] = useState(false);
 
-  // Cargar eventos al montar el componente
   useEffect(() => {
     fetchEvents();
   }, []);
+
+  useEffect(() => {
+    if (selectedEvent) {
+      fetchWaitlistInfo(selectedEvent.id);
+    }
+  }, [selectedEvent]);
 
   const fetchEvents = async () => {
     try {
@@ -26,8 +41,18 @@ export const EventDetail = () => {
     } catch (error) {
       console.error('Error cargando eventos:', error);
       setMessage('Error cargando eventos');
+      setMessageType('error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWaitlistInfo = async (eventId: number) => {
+    try {
+      const response = await api.get(`/api/events/${eventId}/waitlist`);
+      setWaitlistInfo(response.data);
+    } catch (error) {
+      console.error('Error cargando info de lista de espera:', error);
     }
   };
 
@@ -36,32 +61,49 @@ export const EventDetail = () => {
     
     if (!userName || !userEmail) {
       setMessage('Por favor completa todos los campos');
+      setMessageType('error');
       return;
     }
 
     if (!selectedEvent) {
       setMessage('Selecciona un evento primero');
+      setMessageType('error');
       return;
     }
 
     try {
       setLoading(true);
-      await api.post('/api/rsvp', {
+      const response = await api.post('/api/rsvp', {
         event_id: selectedEvent.id,
         user_name: userName,
         user_email: userEmail
       });
-      setMessage('✓ ¡RSVP confirmado exitosamente!');
+      
+      if (response.data.en_lista_espera) {
+        setMessage(`Has sido agregado a la lista de espera en la posición #${response.data.posicion_en_espera}. Te notificaremos cuando se libere un cupo.`);
+        setMessageType('warning');
+        setIsInWaitlist(true);
+      } else {
+        setMessage('¡Tu asistencia ha sido confirmada exitosamente!');
+        setMessageType('success');
+      }
+      
       setUserName('');
       setUserEmail('');
       setSubmitted(true);
+      
+      // Actualizar info de waitlist
+      fetchWaitlistInfo(selectedEvent.id);
+      
       setTimeout(() => {
         setSubmitted(false);
         setMessage('');
-      }, 3000);
+        setIsInWaitlist(false);
+      }, 5000);
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || 'Error al confirmar asistencia';
       setMessage(errorMsg);
+      setMessageType('error');
       console.error('Error en RSVP:', error);
     } finally {
       setLoading(false);
@@ -79,10 +121,10 @@ export const EventDetail = () => {
         <div style={{
           marginBottom: '20px',
           padding: '12px 16px',
-          backgroundColor: message.includes('✓') ? '#ecfdf5' : '#fee',
-          border: `1px solid ${message.includes('✓') ? '#d1fae5' : '#fcc'}`,
+          backgroundColor: messageType === 'success' ? '#ecfdf5' : messageType === 'warning' ? '#fef3c7' : '#fee',
+          border: `1px solid ${messageType === 'success' ? '#d1fae5' : messageType === 'warning' ? '#fde68a' : '#fcc'}`,
           borderRadius: '6px',
-          color: message.includes('✓') ? '#065f46' : '#c33',
+          color: messageType === 'success' ? '#065f46' : messageType === 'warning' ? '#92400e' : '#c33',
           fontSize: '0.95em',
           fontWeight: '500'
         }}>
@@ -183,7 +225,7 @@ export const EventDetail = () => {
                     borderTop: '1px solid #e0e0e0'
                   }}>
                     <div style={{ borderLeft: '3px solid #333', paddingLeft: '16px' }}>
-                      <p style={{ color: '#999', fontSize: '0.85em', marginBottom: '6px', fontWeight: '500', textTransform: 'uppercase' }}>📅 Fecha</p>
+                      <p style={{ color: '#999', fontSize: '0.85em', marginBottom: '6px', fontWeight: '500', textTransform: 'uppercase' }}>Fecha</p>
                       <p style={{ color: '#1a1a1a', fontSize: '1em', fontWeight: '600' }}>
                         {new Date(selectedEvent.date_time).toLocaleDateString('es-ES', { 
                           weekday: 'long', 
@@ -197,16 +239,34 @@ export const EventDetail = () => {
                       </p>
                     </div>
                     <div style={{ borderLeft: '3px solid #333', paddingLeft: '16px' }}>
-                      <p style={{ color: '#999', fontSize: '0.85em', marginBottom: '6px', fontWeight: '500', textTransform: 'uppercase' }}>📍 Modalidad</p>
+                      <p style={{ color: '#999', fontSize: '0.85em', marginBottom: '6px', fontWeight: '500', textTransform: 'uppercase' }}>Modalidad</p>
                       <p style={{ color: '#1a1a1a', fontSize: '1em', fontWeight: '600' }}>{selectedEvent.modality}</p>
                     </div>
                     <div style={{ borderLeft: '3px solid #333', paddingLeft: '16px' }}>
-                      <p style={{ color: '#999', fontSize: '0.85em', marginBottom: '6px', fontWeight: '500', textTransform: 'uppercase' }}>📌 Ubicación</p>
+                      <p style={{ color: '#999', fontSize: '0.85em', marginBottom: '6px', fontWeight: '500', textTransform: 'uppercase' }}>Ubicación</p>
                       <p style={{ color: '#1a1a1a', fontSize: '1em', fontWeight: '600' }}>{selectedEvent.location}</p>
                     </div>
                     <div style={{ borderLeft: '3px solid #333', paddingLeft: '16px' }}>
-                      <p style={{ color: '#999', fontSize: '0.85em', marginBottom: '6px', fontWeight: '500', textTransform: 'uppercase' }}>👥 Capacidad</p>
+                      <p style={{ color: '#999', fontSize: '0.85em', marginBottom: '6px', fontWeight: '500', textTransform: 'uppercase' }}>Capacidad</p>
                       <p style={{ color: '#1a1a1a', fontSize: '1em', fontWeight: '600' }}>{selectedEvent.capacity} personas</p>
+                      {waitlistInfo && (
+                        <div style={{ marginTop: '8px' }}>
+                          <p style={{ 
+                            color: waitlistInfo.cupos_disponibles > 0 ? '#065f46' : '#dc2626', 
+                            fontSize: '0.85em',
+                            fontWeight: '500'
+                          }}>
+                            {waitlistInfo.cupos_disponibles > 0 
+                              ? `${waitlistInfo.cupos_disponibles} cupos disponibles`
+                              : 'Sin cupos disponibles'}
+                          </p>
+                          {waitlistInfo.en_lista_espera > 0 && (
+                            <p style={{ color: '#92400e', fontSize: '0.85em', marginTop: '4px' }}>
+                              {waitlistInfo.en_lista_espera} en lista de espera
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -288,7 +348,7 @@ export const EventDetail = () => {
                         }
                       }}
                     >
-                      {submitted ? '✓ Asistencia Confirmada' : loading ? 'Confirmando...' : 'Confirmar Asistencia'}
+                      {submitted ? (isInWaitlist ? 'En lista de espera' : 'Asistencia Confirmada') : loading ? 'Confirmando...' : (waitlistInfo && waitlistInfo.cupos_disponibles === 0 ? 'Unirse a lista de espera' : 'Confirmar Asistencia')}
                     </button>
                   </form>
                 </div>

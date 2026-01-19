@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 export const CreateEvent = () => {
@@ -8,6 +9,7 @@ export const CreateEvent = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,11 +33,15 @@ export const CreateEvent = () => {
         ...formData,
         date_time: formData.date_time.replace('T', ' ')
       };
-      await api.post('/api/events', formattedData);
-      setMessage('✓ ¡Evento creado correctamente!');
+      const response = await api.post('/api/events', formattedData);
+      const newEventId = response.data.data?.id || response.data.id;
+      setMessage('✓ ¡Evento creado correctamente! Redirigiendo...');
       setMessageType('success');
       setFormData({ title: '', description: '', date_time: '', capacity: 0, modality: 'Presencial', location: '' });
-      setTimeout(() => setMessage(''), 3000);
+      // Redirigir al panel de admin después de 1.5 segundos
+      setTimeout(() => {
+        navigate('/admin');
+      }, 1500);
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || 'Error al crear el evento';
       setMessage(errorMsg);

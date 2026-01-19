@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 export const AdminPanel = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [rsvps, setRsvps] = useState<any[]>([]);
+  const [waitlist, setWaitlist] = useState<any[]>([]);
   const [rsvpEmail, setRsvpEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const navigate = useNavigate();
 
   // Cargar eventos al montar el componente
   useEffect(() => {
@@ -32,16 +35,29 @@ export const AdminPanel = () => {
   useEffect(() => {
     if (selectedEvent) {
       fetchRsvps(selectedEvent.id);
+      fetchWaitlist(selectedEvent.id);
     }
   }, [selectedEvent]);
 
   const fetchRsvps = async (eventId: number) => {
     try {
       const response = await api.get(`/api/events/${eventId}`);
-      setRsvps(response.data.rsvps || []);
+      // Filtrar solo confirmados (no cancelados ni en espera)
+      const allRsvps = response.data.rsvps || [];
+      setRsvps(allRsvps.filter((r: any) => r.status === 'confirmado'));
     } catch (error) {
       console.error('Error cargando asistentes:', error);
       setMessage('Error cargando asistentes');
+    }
+  };
+
+  const fetchWaitlist = async (eventId: number) => {
+    try {
+      const response = await api.get(`/api/events/${eventId}/waitlist`);
+      setWaitlist(response.data.lista_espera || []);
+    } catch (error) {
+      console.error('Error cargando lista de espera:', error);
+      setWaitlist([]);
     }
   };
 
@@ -58,6 +74,35 @@ export const AdminPanel = () => {
     } catch (error) {
       console.error('Error en check-in:', error);
       setMessage('Error registrando check-in');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cancelar RSVP (esto promueve al siguiente en lista de espera)
+  const handleCancelRsvp = async (rsvpId: number, userName: string) => {
+    if (!confirm(`¿Estás seguro de cancelar la asistencia de ${userName}? Si hay personas en lista de espera, se promoverá al siguiente.`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await api.post('/api/rsvp/cancel', { rsvp_id: rsvpId });
+      const data = response.data;
+      
+      if (data.promovido) {
+        setMessage(`✓ Asistencia cancelada. ${data.promovido.user_name} (${data.promovido.user_email}) ha sido promovido de la lista de espera.`);
+      } else {
+        setMessage('✓ Asistencia cancelada correctamente');
+      }
+      
+      if (selectedEvent) {
+        await fetchRsvps(selectedEvent.id);
+        await fetchWaitlist(selectedEvent.id);
+      }
+      setTimeout(() => setMessage(''), 5000);
+    } catch (error: any) {
+      console.error('Error cancelando RSVP:', error);
+      setMessage(error.response?.data?.message || 'Error cancelando asistencia');
     } finally {
       setLoading(false);
     }
@@ -198,9 +243,33 @@ export const AdminPanel = () => {
                 <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '8px' }}>
                   <strong>Ubicación:</strong> {selectedEvent.location}
                 </p>
-                <p style={{ color: '#666', fontSize: '0.9em' }}>
+                <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '12px' }}>
                   <strong>Capacidad:</strong> {selectedEvent.capacity} personas
                 </p>
+                <button
+                  onClick={() => navigate('/detalle', { state: { eventId: selectedEvent.id } })}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: 'transparent',
+                    color: '#333',
+                    border: '1px solid #333',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.85em',
+                    fontWeight: '500',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#333';
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#333';
+                  }}
+                >
+                  👁 Ver página pública del evento
+                </button>
               </div>
 
               <h3 style={{ color: '#1a1a1a', fontSize: '1.1em', marginBottom: '12px', fontWeight: '600' }}>
@@ -215,7 +284,7 @@ export const AdminPanel = () => {
                   flexDirection: 'column',
                   gap: '8px',
                   marginBottom: '20px',
-                  maxHeight: '400px',
+                  maxHeight: '300px',
                   overflowY: 'auto'
                 }}>
                   {rsvps.map((rsvp: any) => (
@@ -244,12 +313,32 @@ export const AdminPanel = () => {
                           </p>
                         )}
                       </div>
-                      {!rsvp.checked_in && (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {!rsvp.checked_in && (
+                          <button
+                            onClick={() => handleCheckIn(rsvp.id)}
+                            style={{
+                              padding: '8px 12px',
+                              backgroundColor: '#333',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.85em',
+                              fontWeight: '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#555'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#333'}
+                          >
+                            Check-in
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleCheckIn(rsvp.id)}
+                          onClick={() => handleCancelRsvp(rsvp.id, rsvp.user_name)}
                           style={{
                             padding: '8px 12px',
-                            backgroundColor: '#333',
+                            backgroundColor: '#dc2626',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
@@ -258,12 +347,67 @@ export const AdminPanel = () => {
                             fontWeight: '500',
                             transition: 'all 0.2s'
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#555'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#333'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
                         >
-                          Check-in
+                          Cancelar
                         </button>
-                      )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Sección de Lista de Espera */}
+              <h3 style={{ color: '#1a1a1a', fontSize: '1.1em', marginBottom: '12px', marginTop: '24px', fontWeight: '600' }}>
+                Lista de Espera ({waitlist.length})
+              </h3>
+
+              {waitlist.length === 0 ? (
+                <p style={{ color: '#999', fontSize: '0.95em', marginBottom: '20px' }}>No hay personas en lista de espera</p>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  marginBottom: '20px',
+                  maxHeight: '200px',
+                  overflowY: 'auto'
+                }}>
+                  {waitlist.map((item: any, index: number) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '12px 16px',
+                        backgroundColor: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div>
+                        <p style={{ color: '#1a1a1a', fontWeight: '500', margin: '0 0 4px 0' }}>
+                          <span style={{ 
+                            backgroundColor: '#f59e0b', 
+                            color: 'white', 
+                            padding: '2px 8px', 
+                            borderRadius: '10px', 
+                            fontSize: '0.8em',
+                            marginRight: '8px'
+                          }}>
+                            #{index + 1}
+                          </span>
+                          {item.user_name}
+                        </p>
+                        <p style={{ color: '#999', fontSize: '0.85em', margin: '0' }}>
+                          {item.user_email}
+                        </p>
+                      </div>
+                      <span style={{ color: '#d97706', fontSize: '0.85em', fontWeight: '500' }}>
+                        En espera
+                      </span>
                     </div>
                   ))}
                 </div>
