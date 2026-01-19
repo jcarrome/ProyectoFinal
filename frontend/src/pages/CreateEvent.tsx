@@ -14,14 +14,27 @@ export const CreateEvent = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.date_time || !formData.capacity || !formData.location) {
-      setMessage('Por favor completa todos los campos requeridos');
-      setMessageType('error');
-      return;
+    // Validaciones del frontend con mensajes claros
+    const errores: string[] = [];
+    
+    if (!formData.title.trim()) {
+      errores.push('El título del evento es obligatorio.');
     }
-
-    if (formData.capacity < 1) {
-      setMessage('El cupo debe ser mayor a 0');
+    
+    if (!formData.date_time) {
+      errores.push('La fecha y hora del evento es obligatoria.');
+    }
+    
+    if (!formData.location.trim()) {
+      errores.push('La ubicación o enlace es obligatorio.');
+    }
+    
+    if (!formData.capacity || formData.capacity < 1) {
+      errores.push('El cupo debe ser de al menos 1 persona.');
+    }
+    
+    if (errores.length > 0) {
+      setMessage('• ' + errores.join('\n• '));
       setMessageType('error');
       return;
     }
@@ -43,8 +56,15 @@ export const CreateEvent = () => {
         navigate('/admin');
       }, 1500);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || 'Error al crear el evento';
-      setMessage(errorMsg);
+      // Manejar errores de validación de Laravel
+      if (error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const errorMessages = Object.values(errors).flat().join('\n• ');
+        setMessage('• ' + errorMessages);
+      } else {
+        const errorMsg = error.response?.data?.message || 'Error al crear el evento. Por favor intenta de nuevo.';
+        setMessage(errorMsg);
+      }
       setMessageType('error');
       console.error('Error en create event:', error);
     } finally {
@@ -62,14 +82,17 @@ export const CreateEvent = () => {
       {message && (
         <div style={{
           marginBottom: '20px',
-          padding: '12px 16px',
-          backgroundColor: messageType === 'success' ? '#ecfdf5' : '#fee',
-          border: `1px solid ${messageType === 'success' ? '#d1fae5' : '#fcc'}`,
-          borderRadius: '6px',
-          color: messageType === 'success' ? '#065f46' : '#c33',
+          padding: '14px 18px',
+          backgroundColor: messageType === 'success' ? '#ecfdf5' : '#fef2f2',
+          border: `1px solid ${messageType === 'success' ? '#d1fae5' : '#fecaca'}`,
+          borderRadius: '8px',
+          color: messageType === 'success' ? '#065f46' : '#991b1b',
           fontSize: '0.95em',
-          fontWeight: '500'
+          fontWeight: '500',
+          whiteSpace: 'pre-line',
+          lineHeight: '1.6'
         }}>
+          {messageType === 'error' && <span style={{ fontWeight: '600', display: 'block', marginBottom: '4px' }}>Corrige los siguientes errores:</span>}
           {message}
         </div>
       )}

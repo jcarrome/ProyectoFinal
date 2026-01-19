@@ -22,6 +22,14 @@ class RsvpController extends Controller
             'event_id' => 'required|exists:events,id',
             'user_name' => 'required|string|max:255',
             'user_email' => 'required|email|max:255',
+        ], [
+            'event_id.required' => 'Debes seleccionar un evento.',
+            'event_id.exists' => 'El evento seleccionado no existe.',
+            'user_name.required' => 'Tu nombre es obligatorio.',
+            'user_name.max' => 'El nombre no puede tener más de 255 caracteres.',
+            'user_email.required' => 'Tu correo electrónico es obligatorio.',
+            'user_email.email' => 'Por favor ingresa un correo electrónico válido.',
+            'user_email.max' => 'El correo no puede tener más de 255 caracteres.',
         ]);
 
         $event = Event::findOrFail($request->event_id);

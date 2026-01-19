@@ -155,14 +155,17 @@ export const AdminPanel = () => {
       {message && (
         <div style={{
           marginBottom: '20px',
-          padding: '12px 16px',
-          backgroundColor: message.includes('✓') ? '#ecfdf5' : '#fee',
-          border: `1px solid ${message.includes('✓') ? '#d1fae5' : '#fcc'}`,
-          borderRadius: '6px',
-          color: message.includes('✓') ? '#065f46' : '#c33',
+          padding: '14px 18px',
+          backgroundColor: message.includes('✓') ? '#ecfdf5' : '#fef2f2',
+          border: `1px solid ${message.includes('✓') ? '#d1fae5' : '#fecaca'}`,
+          borderRadius: '8px',
+          color: message.includes('✓') ? '#065f46' : '#991b1b',
           fontSize: '0.95em',
-          fontWeight: '500'
+          fontWeight: '500',
+          whiteSpace: 'pre-line',
+          lineHeight: '1.6'
         }}>
+          {!message.includes('✓') && <span style={{ fontWeight: '600', display: 'block', marginBottom: '4px' }}>Error:</span>}
           {message}
         </div>
       )}

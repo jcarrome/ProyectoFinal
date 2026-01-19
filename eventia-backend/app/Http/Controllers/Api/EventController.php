@@ -65,9 +65,21 @@ class EventController extends Controller
             'modality' => 'required|string|in:Presencial,Virtual,Híbrido',
             'location' => 'required|string',
         ], [
-            'date_time.date_format' => 'El formato de fecha no es válido',
-            'modality.in' => 'La modalidad debe ser Presencial, Virtual o Híbrido',
+            'title.required' => 'El título del evento es obligatorio.',
+            'title.max' => 'El título no puede tener más de 255 caracteres.',
+            'description.string' => 'La descripción debe ser un texto válido.',
+            'date_time.required' => 'La fecha y hora del evento es obligatoria.',
+            'date_time.date_format' => 'El formato de fecha no es válido. Usa el selector de fecha.',
+            'capacity.required' => 'El cupo máximo es obligatorio.',
+            'capacity.integer' => 'El cupo debe ser un número entero.',
+            'capacity.min' => 'El cupo debe ser de al menos 1 persona.',
+            'modality.required' => 'La modalidad del evento es obligatoria.',
+            'modality.in' => 'La modalidad debe ser: Presencial, Virtual o Híbrido.',
+            'location.required' => 'La ubicación o enlace es obligatorio.',
         ]);
+
+        // Asignar valor por defecto a description si está vacío
+        $validated['description'] = $validated['description'] ?? '';
 
         $event = Event::create($validated);
         return response()->json(['message' => 'Evento creado correctamente', 'data' => $event], 201);

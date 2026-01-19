@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 
 interface WaitlistInfo {
@@ -9,6 +10,9 @@ interface WaitlistInfo {
 }
 
 export const EventDetail = () => {
+  const location = useLocation();
+  const eventIdFromHome = location.state?.eventId;
+  
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [userName, setUserName] = useState('');
@@ -30,12 +34,23 @@ export const EventDetail = () => {
     }
   }, [selectedEvent]);
 
+  // Seleccionar el evento correcto cuando lleguen los datos
+  useEffect(() => {
+    if (events.length > 0 && eventIdFromHome) {
+      const targetEvent = events.find(e => e.id === eventIdFromHome);
+      if (targetEvent) {
+        setSelectedEvent(targetEvent);
+      }
+    }
+  }, [events, eventIdFromHome]);
+
   const fetchEvents = async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/events');
       setEvents(response.data.data || []);
-      if (response.data.data && response.data.data.length > 0) {
+      // Solo seleccionar el primer evento si no viene un eventId específico
+      if (response.data.data && response.data.data.length > 0 && !eventIdFromHome) {
         setSelectedEvent(response.data.data[0]);
       }
     } catch (error) {
@@ -59,14 +74,25 @@ export const EventDetail = () => {
   const handleRSVP = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!userName || !userEmail) {
-      setMessage('Por favor completa todos los campos');
-      setMessageType('error');
-      return;
+    // Validaciones del frontend con mensajes claros
+    const errores: string[] = [];
+    
+    if (!userName.trim()) {
+      errores.push('Tu nombre es obligatorio.');
     }
-
+    
+    if (!userEmail.trim()) {
+      errores.push('Tu correo electrónico es obligatorio.');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      errores.push('Por favor ingresa un correo electrónico válido.');
+    }
+    
     if (!selectedEvent) {
-      setMessage('Selecciona un evento primero');
+      errores.push('Debes seleccionar un evento.');
+    }
+    
+    if (errores.length > 0) {
+      setMessage('• ' + errores.join('\n• '));
       setMessageType('error');
       return;
     }
@@ -101,8 +127,15 @@ export const EventDetail = () => {
         setIsInWaitlist(false);
       }, 5000);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || 'Error al confirmar asistencia';
-      setMessage(errorMsg);
+      // Manejar errores de validación de Laravel
+      if (error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const errorMessages = Object.values(errors).flat().join('\n• ');
+        setMessage('• ' + errorMessages);
+      } else {
+        const errorMsg = error.response?.data?.message || 'Error al confirmar asistencia. Por favor intenta de nuevo.';
+        setMessage(errorMsg);
+      }
       setMessageType('error');
       console.error('Error en RSVP:', error);
     } finally {
@@ -120,14 +153,19 @@ export const EventDetail = () => {
       {message && (
         <div style={{
           marginBottom: '20px',
-          padding: '12px 16px',
-          backgroundColor: messageType === 'success' ? '#ecfdf5' : messageType === 'warning' ? '#fef3c7' : '#fee',
-          border: `1px solid ${messageType === 'success' ? '#d1fae5' : messageType === 'warning' ? '#fde68a' : '#fcc'}`,
-          borderRadius: '6px',
-          color: messageType === 'success' ? '#065f46' : messageType === 'warning' ? '#92400e' : '#c33',
+          padding: '14px 18px',
+          backgroundColor: messageType === 'success' ? '#ecfdf5' : messageType === 'warning' ? '#fef3c7' : '#fef2f2',
+          border: `1px solid ${messageType === 'success' ? '#d1fae5' : messageType === 'warning' ? '#fde68a' : '#fecaca'}`,
+          borderRadius: '8px',
+          color: messageType === 'success' ? '#065f46' : messageType === 'warning' ? '#92400e' : '#991b1b',
           fontSize: '0.95em',
-          fontWeight: '500'
+          fontWeight: '500',
+          whiteSpace: 'pre-line',
+          lineHeight: '1.6'
         }}>
+          {messageType === 'error' && <span style={{ fontWeight: '600', display: 'block', marginBottom: '4px' }}>Corrige los siguientes errores:</span>}
+          {messageType === 'warning' && <span style={{ fontWeight: '600', display: 'block', marginBottom: '4px' }}>Lista de espera:</span>}
+          {messageType === 'success' && <span style={{ fontWeight: '600', display: 'block', marginBottom: '4px' }}>¡Éxito!</span>}
           {message}
         </div>
       )}
