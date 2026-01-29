@@ -10,6 +10,8 @@ export const AdminPanel = () => {
   const [rsvpEmail, setRsvpEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState({ title: '', description: '', date_time: '', capacity: 0, modality: '', location: '' });
   const navigate = useNavigate();
 
   // Cargar eventos al montar el componente
@@ -128,7 +130,7 @@ export const AdminPanel = () => {
   };
 
   const generateCSV = (data: any) => {
-    let csv = 'Evento,Confirmados,Presentes,Porcentaje\n';
+    let csv = 'Evento,Registrados,Presentes,Porcentaje de Personas Confirmadas\n';
     csv += `"${data.evento}",${data.resumen.total_confirmados},${data.resumen.total_presentes},${data.resumen.porcentaje_asistencia}\n\n`;
     csv += 'Asistentes\nNombre,Email,Presente\n';
     data.listado_asistentes.forEach((rsvp: any) => {
@@ -143,6 +145,65 @@ export const AdminPanel = () => {
     link.href = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
+  };
+
+  // Activar modo edición
+  const handleEditClick = () => {
+    if (selectedEvent) {
+      setEditData({
+        title: selectedEvent.title,
+        description: selectedEvent.description || '',
+        date_time: selectedEvent.date_time.replace(' ', 'T'),
+        capacity: selectedEvent.capacity,
+        modality: selectedEvent.modality,
+        location: selectedEvent.location
+      });
+      setEditMode(true);
+    }
+  };
+
+  // Guardar cambios del evento
+  const handleSaveEdit = async () => {
+    try {
+      setLoading(true);
+      const formattedData = {
+        ...editData,
+        date_time: editData.date_time.replace('T', ' ')
+      };
+      await api.put(`/api/events/${selectedEvent.id}`, formattedData);
+      setMessage('✓ Evento actualizado correctamente');
+      setEditMode(false);
+      await fetchEvents();
+      // Actualizar el evento seleccionado
+      const updated = { ...selectedEvent, ...formattedData };
+      setSelectedEvent(updated);
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error actualizando evento:', error);
+      setMessage('Error al actualizar el evento');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Eliminar evento
+  const handleDeleteEvent = async () => {
+    if (!confirm(`¿Estás seguro de eliminar el evento "${selectedEvent.title}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await api.delete(`/api/events/${selectedEvent.id}`);
+      setMessage('✓ Evento eliminado correctamente');
+      setSelectedEvent(null);
+      await fetchEvents();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error eliminando evento:', error);
+      setMessage('Error al eliminar el evento');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -230,50 +291,159 @@ export const AdminPanel = () => {
                 {selectedEvent.title}
               </h2>
 
-              <div style={{
-                backgroundColor: '#f9f9f9',
-                padding: '16px',
-                borderRadius: '6px',
-                marginBottom: '20px',
-                border: '1px solid #e0e0e0'
-              }}>
-                <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '8px' }}>
-                  <strong>Fecha:</strong> {new Date(selectedEvent.date_time).toLocaleDateString('es-ES')} {new Date(selectedEvent.date_time).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-                <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '8px' }}>
-                  <strong>Modalidad:</strong> {selectedEvent.modality}
-                </p>
-                <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '8px' }}>
-                  <strong>Ubicación:</strong> {selectedEvent.location}
-                </p>
-                <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '12px' }}>
-                  <strong>Capacidad:</strong> {selectedEvent.capacity} personas
-                </p>
-                <button
-                  onClick={() => navigate('/detalle', { state: { eventId: selectedEvent.id } })}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: 'transparent',
-                    color: '#333',
-                    border: '1px solid #333',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.85em',
-                    fontWeight: '500',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#333';
-                    e.currentTarget.style.color = 'white';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#333';
-                  }}
-                >
-                  👁 Ver página pública del evento
-                </button>
-              </div>
+              {/* Formulario de edición */}
+              {editMode ? (
+                <div style={{
+                  backgroundColor: '#f9f9f9',
+                  padding: '20px',
+                  borderRadius: '6px',
+                  marginBottom: '20px',
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '1em' }}>Editar Evento</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <input
+                      type="text"
+                      placeholder="Título"
+                      value={editData.title}
+                      onChange={e => setEditData({...editData, title: e.target.value})}
+                      style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                    <textarea
+                      placeholder="Descripción"
+                      value={editData.description}
+                      onChange={e => setEditData({...editData, description: e.target.value})}
+                      style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px', minHeight: '60px' }}
+                    />
+                    <input
+                      type="datetime-local"
+                      value={editData.date_time}
+                      onChange={e => setEditData({...editData, date_time: e.target.value})}
+                      style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Capacidad"
+                      value={editData.capacity}
+                      onChange={e => setEditData({...editData, capacity: parseInt(e.target.value) || 0})}
+                      style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                    <select
+                      value={editData.modality}
+                      onChange={e => setEditData({...editData, modality: e.target.value})}
+                      style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    >
+                      <option value="Presencial">Presencial</option>
+                      <option value="Virtual">Virtual</option>
+                      <option value="Híbrido">Híbrido</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Ubicación / Enlace"
+                      value={editData.location}
+                      onChange={e => setEditData({...editData, location: e.target.value})}
+                      style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                    />
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        onClick={handleSaveEdit}
+                        style={{ flex: 1, padding: '10px', backgroundColor: '#333', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        onClick={() => setEditMode(false)}
+                        style={{ flex: 1, padding: '10px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  backgroundColor: '#f9f9f9',
+                  padding: '16px',
+                  borderRadius: '6px',
+                  marginBottom: '20px',
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '8px' }}>
+                    <strong>Fecha:</strong> {new Date(selectedEvent.date_time).toLocaleDateString('es-ES')} {new Date(selectedEvent.date_time).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '8px' }}>
+                    <strong>Modalidad:</strong> {selectedEvent.modality}
+                  </p>
+                  <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '8px' }}>
+                    <strong>Ubicación:</strong> {selectedEvent.location}
+                  </p>
+                  <p style={{ color: '#666', fontSize: '0.9em', marginBottom: '12px' }}>
+                    <strong>Capacidad:</strong> {selectedEvent.capacity} personas
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => navigate('/detalle', { state: { eventId: selectedEvent.id } })}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: 'transparent',
+                        color: '#333',
+                        border: '1px solid #333',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.85em',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#333';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#333';
+                      }}
+                    >
+                      Ver
+                    </button>
+                    <button
+                      onClick={handleEditClick}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#333',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.85em',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#555'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#333'}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={handleDeleteEvent}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.85em',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <h3 style={{ color: '#1a1a1a', fontSize: '1.1em', marginBottom: '12px', fontWeight: '600' }}>
                 Asistentes ({rsvps.length})

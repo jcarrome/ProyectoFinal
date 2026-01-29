@@ -4,7 +4,7 @@ import api from '../services/api';
 
 export const CreateEvent = () => {
   const [formData, setFormData] = useState({
-    title: '', description: '', date_time: '', capacity: 0, modality: 'Presencial', location: ''
+    title: '', description: '', date_time: '', capacity: 0, modality: 'Presencial', location: '', price: 0
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -19,6 +19,9 @@ export const CreateEvent = () => {
     
     if (!formData.title.trim()) {
       errores.push('El título del evento es obligatorio.');
+    }
+    if (formData.price<0) {
+      errores.push('El precio no puede ser negativo.');
     }
     
     if (!formData.date_time) {
@@ -50,7 +53,7 @@ export const CreateEvent = () => {
       const newEventId = response.data.data?.id || response.data.id;
       setMessage('✓ ¡Evento creado correctamente! Redirigiendo...');
       setMessageType('success');
-      setFormData({ title: '', description: '', date_time: '', capacity: 0, modality: 'Presencial', location: '' });
+      setFormData({ title: '', description: '', date_time: '', capacity: 0, modality: 'Presencial', location: '', price: 0 });
       // Redirigir al panel de admin después de 1.5 segundos
       setTimeout(() => {
         navigate('/admin');
@@ -236,6 +239,27 @@ export const CreateEvent = () => {
               onBlur={(e) => e.target.style.borderColor = '#ddd'}
             />
           </div>
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '6px', color: '#333', fontSize: '0.9em', fontWeight: '500' }}>Precio*</label>
+          <input 
+            type="int" 
+            placeholder="Ej: Conferencia Tech 2026" 
+            value={formData.price}
+            onChange={e => setFormData({...formData, price: e.target.value})}
+            style={{
+              width: '100%',
+              padding: '11px 12px',
+              border: '1px solid #ddd',
+              borderRadius: '6px',
+              fontSize: '0.95em',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s',
+              boxSizing: 'border-box'
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#999'}
+            onBlur={(e) => e.target.style.borderColor = '#ddd'}
+          />
         </div>
 
         <button 
